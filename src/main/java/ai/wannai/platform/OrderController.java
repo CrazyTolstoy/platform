@@ -6,28 +6,63 @@ import ai.wannai.platform.entities.OrderAddress;
 import ai.wannai.platform.entities.OrderItem;
 import ai.wannai.platform.repositories.OrderRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
 public class OrderController {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderController.class);
     private final OrderRepository orderRepository;
     private final WooCommerceService wooCommerceService;
 
 
     @GetMapping
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Order>> getAllOrders() {
-        // If your relationships are LAZY, see the repository note below to fetch children.
+        // Load orders (JPA -> Supabase)
         List<Order> orders = orderRepository.findAll();
-        return ResponseEntity.ok(orders);
 
+        // Collect ALL product IDs (even if an item already has a name)
+        Set<Long> productIds = orders.stream()
+                .flatMap(o -> o.getItems().stream())
+                .map(OrderItem::getProductId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (!productIds.isEmpty()) {
+            try {
+                // Always fetch (and overwrite) names from Woo
+                Map<Long, String> idToName = wooCommerceService.fetchNamesByIds(productIds);
+                orders.forEach(o -> o.getItems().forEach(i -> {
+                    Long pid = i.getProductId();
+                    if (pid != null) {
+                        String freshName = idToName.get(pid);
+                        if (freshName != null && !freshName.isBlank()) {
+                            i.setName(freshName); // overwrite whatever was there
+                        }
+                    }
+                }));
+            } catch (Exception ex) {
+                log.warn("Failed to fetch product names from WooCommerce", ex);
+            }
+        }
+
+        return ResponseEntity.ok(orders);
     }
+
 
 
         @PostMapping

@@ -27,4 +27,7 @@ public class OrderItem {
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Order order;
+
+    @Transient
+    private String name;
 }

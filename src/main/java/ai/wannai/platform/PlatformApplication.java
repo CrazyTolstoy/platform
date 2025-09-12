@@ -19,7 +19,10 @@ public class PlatformApplication {
 			@Override
 			public void addCorsMappings(CorsRegistry registry) {
 				registry.addMapping("/**")
-						.allowedOriginPatterns("http://localhost:4200")
+						.allowedOrigins(
+								"http://localhost:4200",
+								"http://192.168.1.102:4200"
+						)
 						.allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
 						.allowedHeaders("*")
 						.exposedHeaders("*")
@@ -27,4 +30,5 @@ public class PlatformApplication {
 			}
 		};
 	}
+
 }
